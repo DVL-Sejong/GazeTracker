@@ -1,6 +1,6 @@
 import math
 
-from database import constant
+from objects import constant
 from objects.object import Point
 
 
