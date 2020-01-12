@@ -11,10 +11,14 @@ class Tobii:
         self.dictionary = None
 
     def run(self):
+        self.raw_data.__init__(self)
         self.tobii.subscribe_to(tr.EYETRACKER_GAZE_DATA, self.raw_data.gaze_data_callback, as_dictionary=True)
 
     def end(self):
         self.tobii.unsubscribe_from(tr.EYETRACKER_GAZE_DATA, self.raw_data.gaze_data_callback)
+        self.tracker.data.order_in_time()
+        self.tracker.save()
+        self.tracker.paint.points = []
 
     def to_dictionary(self):
         index = len(self.raw_data.left_gaze_point_on_display_area) - 1
