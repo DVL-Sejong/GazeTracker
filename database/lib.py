@@ -6,7 +6,7 @@ https://dev.mysql.com/doc/connector-python/en/connector-python-reference.html
 SQL Injection Warning: pymysql.escape_string(value)
 """
 
-from pymysql import (connect, cursors, err, escape_sequence)
+from pymysql import (connect, cursors, escape_sequence)
 
 
 def connect_db(mysqldb_conn):
@@ -246,7 +246,3 @@ class MYSQL:
     def close(self):
         if getattr(self, 'connection', 0):
             return self.connection.close()
-
-    def __del__(self):
-        """close mysql database connection"""
-        self.close()
