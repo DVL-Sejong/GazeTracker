@@ -9,12 +9,15 @@ class Tobii:
         self.tobii = tr.find_all_eyetrackers()[0]
         self.raw_data = RawData(self)
         self.dictionary = None
+        self.isRunning = False
 
     def run(self):
         self.raw_data.__init__(self)
+        self.isRunning = True
         self.tobii.subscribe_to(tr.EYETRACKER_GAZE_DATA, self.raw_data.gaze_data_callback, as_dictionary=True)
 
     def end(self):
+        self.isRunning = False
         self.tobii.unsubscribe_from(tr.EYETRACKER_GAZE_DATA, self.raw_data.gaze_data_callback)
         self.tracker.data.order_in_time()
         self.tracker.save()

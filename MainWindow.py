@@ -1,109 +1,243 @@
-# -*- coding: utf-8 -*-
+import math
+import sys
+from operator import eq
 
-# Form implementation generated from reading ui file 'custom2.ui'
-#
-# Created by: PyQt5 UI code generator 5.14.1
-#
-# WARNING! All changes made in this file will be lost!
-
+import pyautogui
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QLabel
+from PyQt5.QtCore import pyqtSlot, QSize
+from PyQt5.QtGui import QImage, QPixmap, QPalette, QBrush, QPainter
+from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 
-from objects.object import Point
-
-
-class Ui_MainWindow(object):
-    def setupUi(self, MainWindow):
-        MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1886, 1338)
-        self.centralwidget = QtWidgets.QWidget(MainWindow)
-        self.centralwidget.setObjectName("centralwidget")
-        self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
-        self.gridLayout.setObjectName("gridLayout")
-        self.verticalLayout = QtWidgets.QVBoxLayout()
-        self.verticalLayout.setSpacing(0)
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.widget = QtWidgets.QWidget(self.centralwidget)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.widget.sizePolicy().hasHeightForWidth())
-        self.widget.setSizePolicy(sizePolicy)
-        self.widget.setStyleSheet("background-color: rgb(255, 170, 255)")
-        self.widget.setObjectName("widget")
-        self.gridLayout_2 = QtWidgets.QGridLayout(self.widget)
-        self.gridLayout_2.setContentsMargins(0, -1, 0, -1)
-        self.gridLayout_2.setObjectName("gridLayout_2")
-        self.brun = QtWidgets.QPushButton(self.widget)
-        self.brun.setObjectName("brun")
-        self.gridLayout_2.addWidget(self.brun, 0, 0, 1, 1)
-        self.bend = QtWidgets.QPushButton(self.widget)
-        self.bend.setObjectName("bend")
-        self.gridLayout_2.addWidget(self.bend, 0, 1, 1, 1)
-        self.bvisible = QtWidgets.QPushButton(self.widget)
-        self.bvisible.setObjectName("bvisible")
-        self.gridLayout_2.addWidget(self.bvisible, 0, 2, 1, 1)
-        self.bunvisible = QtWidgets.QPushButton(self.widget)
-        self.bunvisible.setObjectName("bunvisible")
-        self.gridLayout_2.addWidget(self.bunvisible, 0, 3, 1, 1)
-        spacerItem = QtWidgets.QSpacerItem(1287, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.gridLayout_2.addItem(spacerItem, 0, 4, 1, 1)
-        self.verticalLayout.addWidget(self.widget)
-        self.paint = Paint(self.centralwidget)
-        self.paint.setStyleSheet("background-color: rgb(194, 221, 255)")
-        self.paint.setText("")
-        self.paint.setObjectName("paint")
-        self.verticalLayout.addWidget(self.paint)
-        self.gridLayout.addLayout(self.verticalLayout, 0, 0, 1, 1)
-        MainWindow.setCentralWidget(self.centralwidget)
-        self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1886, 36))
-        self.menubar.setObjectName("menubar")
-        MainWindow.setMenuBar(self.menubar)
-        self.statusbar = QtWidgets.QStatusBar(MainWindow)
-        self.statusbar.setObjectName("statusbar")
-        MainWindow.setStatusBar(self.statusbar)
-
-        self.retranslateUi(MainWindow)
-        QtCore.QMetaObject.connectSlotsByName(MainWindow)
-
-    def retranslateUi(self, MainWindow):
-        _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
-        self.brun.setText(_translate("MainWindow", "run"))
-        self.bend.setText(_translate("MainWindow", "end"))
-        self.bvisible.setText(_translate("MainWindow", "visible"))
-        self.bunvisible.setText(_translate("MainWindow", "unvisible"))
+from database.lib import MYSQL
+from gui.main import Ui_MainWindow
+from src.Calibration import Calibration
+import database.constant as dbconstant
+from src.Tracker import Tracker
 
 
-class Paint(QLabel):
-    def __init__(self, parent):
-        super().__init__(parent=parent)
-        self.points = []
-        self.left = Point(0, 0, 0)
-        self.right = Point(0, 0, 0)
+class MainWindow(QMainWindow, Ui_MainWindow):
+    resized = QtCore.pyqtSignal()
 
-    def paintEvent(self, e):
-        super().paintEvent(e)
-        if self.left.validity is 0 or self.right.validity is 0: return
-        self.points.append(self.left)
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+        self.pushButton_bubble.clicked.connect(self.on_click)
+        self.pushButton_dbsetting.clicked.connect(self.on_click)
+        self.pushButton_shortcuts.clicked.connect(self.on_click)
+        self.pushButton_calibrate.clicked.connect(self.on_click)
+        self.pushButton_start.clicked.connect(self.on_click)
+        self.pushButton_ok.clicked.connect(self.on_click)
+        self.pushButton_cancel.clicked.connect(self.on_click)
+        self.pushButton_apply.clicked.connect(self.on_click)
+        self.edit_ratioValue.returnPressed.connect(self.on_enter)
+        self.edit_id.returnPressed.connect(self.on_enter)
+        self.check_id.stateChanged.connect(self.on_check)
+        self.frame_board.installEventFilter(self)
+        self.image = QImage()
+        self.image_size = QSize()
+        self.stack.setCurrentWidget(self.page_main)
+        self.url = ""
+        self.customConnected = False
 
-        qp = QtGui.QPainter(self)
-        qp.setRenderHint(QtGui.QPainter.Antialiasing)
-        pen = QtGui.QPen(QtCore.Qt.red, 5)
-        brush = QtGui.QBrush(QtCore.Qt.red)
-        qp.setPen(pen)
-        qp.setBrush(brush)
+    def on_calibration_click(self, name):
+        if eq(name, "close"):
+            self.calibration_window.destroy()
+        if eq(name, "cancel"):
+            self.calibration_window.destroy()
+        if eq(name, "calibrate"):
+            if eq(self.calibration_window.url, ""): return
+            self.url = self.calibration_window.url
+            self.setImageSize(self.calibration_window.image_size)
+            self.calibration_window.destroy()
+            self.setBoardBackground()
 
-        for point in self.points:
-            qp.drawEllipse(point.x, point.y, 5, 5)
+    def on_check(self):
+        if self.check_id.isChecked():
+            if self.isExistingID():
+                self.warning("Duplicated ID!")
+                self.check_id.setChecked(False)
+
+    def on_enter(self):
+        sending_edit = self.sender()
+        if eq(sending_edit.objectName(), "edit_ratioValue"):
+            if self.isFloat(self.edit_ratioValue.displayText()) is not True: return
+            if eq(self.url, "") is True:
+                self.edit_ratioValue.setText("")
+                return
+            width = (float(self.edit_ratioValue.displayText()) * self.image.size().width()) / 100
+            if width <= 0:
+                self.setImageSize(self.image_size)
+                return
+            self.image_size.setWidth(width)
+            self.image_size.setHeight(self.getScaledHeight(width))
+            self.setImageSize(self.image_size)
+        if eq(sending_edit.objectName(), "edit_id"):
+            if self.isExistingID():
+                self.warning("Duplicated ID!")
+            elif self.isValidID() is not True:
+                self.edit_id.setText("")
+            else:
+                self.check_id.setChecked(True)
+
+    def warning(self, warning):
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Critical)
+            msg.setText(warning)
+            msg.setWindowTitle("Error")
+            msg.show()
+            msg.exec_()
+
+    def isValidID(self):
+        if eq(self.edit_id.displayText(), "") is True: return False
+        if len(self.edit_id.displayText()) > 255: return False
+        return True
+
+    def isExistingID(self):
+        if self.customConnected is True:
+            dbconn = MYSQL(
+                dbhost=self.table.item(0, 0).text(),
+                dbuser=self.table.item(1, 0).text(),
+                dbpwd=self.table.item(2, 0).text(),
+                dbname=self.table.item(3, 0).text(),
+                dbcharset=self.table.item(4, 0).text()
+            )
+        else:
+            dbconn = MYSQL(
+                dbhost=dbconstant.HOST,
+                dbuser=dbconstant.USER,
+                dbpwd=dbconstant.PASSWORD,
+                dbname=dbconstant.DB_NAME,
+                dbcharset=dbconstant.CHARSET
+            )
+
+        condition = {'id': self.edit_id.displayText()}
+        count = dbconn.count(table=dbconstant.TABLE, condition=condition)
+        dbconn.close()
+
+        return True if count > 0 else False
+
+    def isFloat(self, str):
+        try:
+            float(str)
+            return True
+        except:
+            return False
+
+    @pyqtSlot()
+    def on_click(self):
+        sending_button = self.sender()
+        if eq(sending_button.objectName(), "pushButton_bubble"):
+            self.toggleName(sending_button)
+        if eq(sending_button.objectName(), "pushButton_dbsetting"):
+            self.stack.setCurrentWidget(self.page_database)
+        if eq(sending_button.objectName(), "pushButton_shortcuts"):
+            self.stack.setCurrentWidget(self.page_shortcuts)
+        if eq(sending_button.objectName(), "pushButton_calibrate"):
+            if self.image_size.width() > pyautogui.size().width or self.image_size.height() > pyautogui.size().height:
+                self.warning("Image size is too big")
+                return
+            self.calibration_window = Calibration(self, self.url, self.image_size)
+            self.calibration_window.show()
+        if eq(sending_button.objectName(), "pushButton_start"):
+            isPlotting = True if eq(self.pushButton_calibrate.text(), "ok") else False
+            # 2. db 체크
+            if self.check_id.isChecked():
+                if eq(self.edit_id.text(), ""):
+                    self.warning("there is no id")
+                    return
+                if self.isExistingID():
+                    self.warning("Database ID Duplicated!")
+                    return
+                id = self.edit_id.text()
+            else:
+                id = ""
+            # 3. 이미지 체크
+            if eq(self.url, ""):
+                self.warning("There is no image!")
+                return
+            if self.image_size.width() > pyautogui.size().width or self.image_size.height() > pyautogui.size().height:
+                self.warning("Image size is too big")
+                return
+            self.tracking_window = Tracker(self.url, self.image_size, isPlotting, id, self.table, self.customConnected)
+            self.tracking_window.showFullScreen()
+            self.tracking_window.setFixedSize(self.tracking_window.size())
+        if eq(sending_button.objectName(), "pushButton_ok"):
+            self.stack.setCurrentWidget(self.page_main)
+        if eq(sending_button.objectName(), "pushButton_cancel"):
+            filled = self.checkFilled()
+            if filled is False:
+                self.table.clearContents()
+                self.stack.setCurrentWidget(self.page_main)
+                return
+            if self.checkConnect() is False:
+                self.table.clearContents()
+                self.stack.setCurrentWidget(self.page_main)
+        if eq(sending_button.objectName(), "pushButton_apply"):
+            if self.checkFilled() is not True:
+                self.warning("Not Filled!")
+                return
+            if self.checkConnect() is True:
+                self.stack.setCurrentWidget(self.page_main)
+            else:
+                self.warning("Not Valid Information!")
+
+    def checkFilled(self):
+        for row in range(5):
+            if self.table.item(row, 0) is None:
+                self.customConnected = False
+                return False
+        return True
+
+    def checkConnect(self):
+        dbconn = MYSQL(
+            dbhost=self.table.item(0, 0).text(),
+            dbuser=self.table.item(1, 0).text(),
+            dbpwd=self.table.item(2, 0).text(),
+            dbname=self.table.item(3, 0).text(),
+            dbcharset=self.table.item(4, 0).text()
+        )
+
+        if dbconn.session() is None:
+            dbconn.close()
+            self.customConnected = False
+            return False
+        else:
+            dbconn.close()
+            self.customConnected = True
+            return True
+
+    def eventFilter(self, object, event):
+        if object is self.frame_board:
+            if event.type() == QtCore.QEvent.Drop:
+                if event.mimeData().hasUrls():
+                    event.accept()
+                    self.url = event.mimeData().urls()[0].toLocalFile()
+                    self.setBoardBackground()
+                    self.setImageSize(self.image.size())
+                else:
+                    event.ignore()
+        return False
+
+    def setBoardBackground(self):
+        self.image = QImage(self.url)
+        pixmap = QPixmap(self.url)
+        pixmap = pixmap.scaled(self.frame_board.width(), self.getScaledHeight(self.frame_board.width()))
+        self.frame_board.setPixmap(pixmap)
+
+    def getScaledHeight(self, width):
+        height = math.floor((width * self.image.size().height()) / self.image.size().width())
+        return height
+
+    def setImageSize(self, size):
+        self.image_size = size
+        self.ratio = (100 * self.image_size.width()) / self.image.size().width()
+        self.label_widthValue.setText("%d" % self.image_size.width())
+        self.label_heightValue.setText("%d" % self.image_size.height())
+        self.edit_ratioValue.setText("%0.2f" % self.ratio)
 
 
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    MainWindow = QtWidgets.QMainWindow()
-    ui = Ui_MainWindow()
-    ui.setupUi(MainWindow)
-    MainWindow.show()
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    ex = MainWindow()
+    ex.show()
     sys.exit(app.exec_())
